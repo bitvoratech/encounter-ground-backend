@@ -5,6 +5,8 @@ import { env } from "./config/env.js";
 import { query } from "./db/pool.js";
 import { meRouter } from "./routes/me.js";
 import { booksRouter, eventsRouter } from "./routes/catalog.js";
+import { selfTestsRouter } from "./routes/selfTests.js";
+import { contactRouter } from "./routes/contact.js";
 
 export const app = express();
 
@@ -23,6 +25,8 @@ app.get("/health", async (_req, res) => {
 app.use("/me", meRouter);
 app.use("/books", booksRouter);
 app.use("/events", eventsRouter);
+app.use("/self-tests", selfTestsRouter);
+app.use("/contact", contactRouter);
 
 app.use((_req, res) => {
   res.status(404).json({ error: "Not found" });

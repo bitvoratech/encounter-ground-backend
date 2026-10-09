@@ -30,6 +30,9 @@ Money is stored in kobo (integer). Every table has row-level security; the API c
 | GET | `/health` | public |
 | GET | `/events`, `/events/:slug` | public |
 | GET | `/books`, `/books/:slug` | public |
+| GET | `/self-tests`, `/self-tests/:slug` | public |
+| POST | `/self-tests/:slug/attempts` | public (linked to the member if signed in) |
+| POST | `/contact` | public (linked to the member if signed in) |
 | GET / PATCH | `/me` | signed in |
 | GET | `/me/books`, `/me/courses` | signed in |
 
