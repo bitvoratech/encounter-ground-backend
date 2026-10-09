@@ -1,15 +1,17 @@
 {
-  "name": "backend",
+  "name": "encounter-ground-backend",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "db:migrate": "dotenv -e .env -- node-pg-migrate -m migrations -j sql up",
-    "db:down": "dotenv -e .env -- node-pg-migrate -m migrations -j sql down",
-    "db:new": "node-pg-migrate -m migrations -j sql create"
+    "typecheck": "tsc --noEmit",
+    "db:start": "supabase start",
+    "db:reset": "supabase db reset",
+    "db:new": "supabase migration new",
+    "db:push": "supabase db push"
   },
   "keywords": [],
   "author": "",
