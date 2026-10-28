@@ -8,6 +8,7 @@ import { booksRouter, eventsRouter } from "./routes/catalog.js";
 import { selfTestsRouter } from "./routes/selfTests.js";
 import { contactRouter } from "./routes/contact.js";
 import { coursesRouter, myCoursesRouter } from "./routes/school.js";
+import { adminRouter } from "./routes/admin.js";
 
 export const app = express();
 
@@ -31,6 +32,7 @@ app.use("/books", booksRouter);
 app.use("/events", eventsRouter);
 app.use("/self-tests", selfTestsRouter);
 app.use("/contact", contactRouter);
+app.use("/admin", adminRouter);
 
 app.use((_req, res) => {
   res.status(404).json({ error: "Not found" });

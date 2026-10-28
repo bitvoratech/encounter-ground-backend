@@ -110,22 +110,32 @@ coursesRouter.get("/:slug", async (req, res) => {
 
 myCoursesRouter.use(requireAuth);
 
-/** The member's classes: when they enrolled and which lessons they've finished. */
+type TeacherReply = { lesson: string; feedback: string; reviewed_at: string };
+
+/** The member's classes: when they enrolled, which lessons they've finished, and teachers'
+ * replies to their checkpoints. */
 myCoursesRouter.get("/", async (req: AuthedRequest, res) => {
-  const rows = await query<{ slug: string; enrolled_at: string; completed: string[] | null }>(
+  const rows = await query<{ slug: string; enrolled_at: string; completed: string[] | null; replies: TeacherReply[] | null }>(
     `select c.slug, e.enrolled_at,
             (select array_agg(l.slug order by m.position, l.position)
                from lesson_progress lp
                join lessons l on l.id = lp.lesson_id
                join course_modules m on m.id = l.module_id
               where lp.user_id = e.user_id and m.course_id = c.id and lp.completed_at is not null)
-              as completed
+              as completed,
+            (select json_agg(json_build_object('lesson', l.slug, 'feedback', s.feedback, 'reviewed_at', s.reviewed_at)
+                             order by s.reviewed_at desc)
+               from checkpoint_submissions s
+               join lessons l on l.id = s.lesson_id
+               join course_modules m on m.id = l.module_id
+              where s.user_id = e.user_id and m.course_id = c.id and s.reviewed_at is not null)
+              as replies
        from enrollments e join courses c on c.id = e.course_id
       where e.user_id = $1
       order by e.enrolled_at`,
     [req.user!.id],
   );
-  res.json(rows.map((r) => ({ ...r, completed: r.completed ?? [] })));
+  res.json(rows.map((r) => ({ ...r, completed: r.completed ?? [], replies: r.replies ?? [] })));
 });
 
 myCoursesRouter.post("/:slug/enrol", async (req: AuthedRequest, res) => {
