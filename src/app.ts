@@ -7,6 +7,7 @@ import { meRouter } from "./routes/me.js";
 import { booksRouter, eventsRouter } from "./routes/catalog.js";
 import { selfTestsRouter } from "./routes/selfTests.js";
 import { contactRouter } from "./routes/contact.js";
+import { coursesRouter, myCoursesRouter } from "./routes/school.js";
 
 export const app = express();
 
@@ -22,7 +23,10 @@ app.get("/health", async (_req, res) => {
   res.json({ ok: true });
 });
 
+// Before /me, so /me/courses reaches the school router.
+app.use("/me/courses", myCoursesRouter);
 app.use("/me", meRouter);
+app.use("/courses", coursesRouter);
 app.use("/books", booksRouter);
 app.use("/events", eventsRouter);
 app.use("/self-tests", selfTestsRouter);

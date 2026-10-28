@@ -33,8 +33,14 @@ Money is stored in kobo (integer). Every table has row-level security; the API c
 | GET | `/self-tests`, `/self-tests/:slug` | public |
 | POST | `/self-tests/:slug/attempts` | public (linked to the member if signed in) |
 | POST | `/contact` | public (linked to the member if signed in) |
+| GET | `/courses`, `/courses/:slug` | public (final-check answers never sent) |
 | GET / PATCH | `/me` | signed in |
-| GET | `/me/books`, `/me/courses` | signed in |
+| GET | `/me/books` | signed in |
+| GET | `/me/courses` | signed in: enrolled classes and finished lessons |
+| POST | `/me/courses/:slug/enrol` | signed in (free classes only until payments) |
+| PUT | `/me/courses/:slug/lessons/:lesson/complete` | signed in, enrolled: video, audio, reading, study guide |
+| POST | `/me/courses/:slug/lessons/:lesson/checkpoint` | signed in, enrolled: saves the reflection for a teacher |
+| POST | `/me/courses/:slug/lessons/:lesson/quiz` | signed in, enrolled: marks the final check |
 
 Send the Supabase access token as `Authorization: Bearer <token>`.
 
