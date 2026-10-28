@@ -50,22 +50,3 @@ meRouter.get("/books", async (req: AuthedRequest, res) => {
   );
   res.json(rows);
 });
-
-/** Courses the signed-in member is enrolled in, with progress. */
-meRouter.get("/courses", async (req: AuthedRequest, res) => {
-  const rows = await query(
-    `select c.id, c.slug, c.title, c.cover_image_url, e.enrolled_at, e.completed_at,
-            (select count(*) from lessons l join course_modules m on m.id = l.module_id
-              where m.course_id = c.id)::int as lesson_count,
-            (select count(*) from lesson_progress lp
-               join lessons l on l.id = lp.lesson_id
-               join course_modules m on m.id = l.module_id
-              where m.course_id = c.id and lp.user_id = e.user_id
-                and lp.completed_at is not null)::int as lessons_completed
-       from enrollments e join courses c on c.id = e.course_id
-      where e.user_id = $1
-      order by e.enrolled_at desc`,
-    [req.user!.id],
-  );
-  res.json(rows);
-});
