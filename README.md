@@ -29,11 +29,12 @@ Money is stored in kobo (integer). Every table has row-level security; the API c
 |---|---|---|
 | GET | `/health` | public |
 | GET | `/events`, `/events/:slug` | public |
-| GET | `/books`, `/books/:slug` | public |
+| GET | `/books`, `/books/:slug` | public: prices per currency in minor units, e.g. `{ "NGN": 750000, "USD": 999 }` |
 | GET | `/self-tests`, `/self-tests/:slug` | public |
 | POST | `/self-tests/:slug/attempts` | public (linked to the member if signed in) |
 | POST | `/contact` | public (linked to the member if signed in) |
 | GET | `/courses`, `/courses/:slug` | public (final-check answers never sent) |
+| GET | `/courses/:slug/lessons/:lesson` | preview lessons public, others enrolled: written teaching, video link, signed file link |
 | GET / PATCH | `/me` | signed in |
 | GET | `/me/books` | signed in |
 | GET | `/me/courses` | signed in: enrolled classes, finished lessons, teachers' replies |
@@ -48,6 +49,18 @@ Money is stored in kobo (integer). Every table has row-level security; the API c
 | PUT | `/admin/messages/:id` | staff: mark handled or reopen |
 | GET | `/admin/members?q=` | admin: members, newest first, searchable |
 | PUT | `/admin/members/:id` | admin: change someone else's role |
+| GET / POST | `/admin/books` | staff: every book (any status) with prices; add a book |
+| GET / PUT / DELETE | `/admin/books/:id` | staff: one book; edit; delete (only if nobody has bought it) |
+| GET / POST | `/admin/courses` | staff: every class; add a class |
+| GET / PUT / DELETE | `/admin/courses/:id` | staff: a class with modules, lessons, content and final check; edit; delete (only with no enrolments) |
+| PUT | `/admin/courses/:id/order` | staff: reorder modules and lessons (lessons can move between modules) |
+| PUT | `/admin/courses/:id/quiz` | staff: replace the final-check questions |
+| POST | `/admin/courses/:id/modules` | staff: add a module |
+| PUT / DELETE | `/admin/modules/:id` | staff: edit; delete (only when empty) |
+| POST | `/admin/modules/:id/lessons` | staff: add a lesson (its web address is made from the title) |
+| PUT / DELETE | `/admin/lessons/:id` | staff: edit; delete |
+
+Book covers and lesson files (PDF, audio) are uploaded by the admin page straight to Supabase Storage (`covers` is public, `lesson-files` is private and served through signed links); storage policies allow only staff to upload.
 
 Send the Supabase access token as `Authorization: Bearer <token>`.
 

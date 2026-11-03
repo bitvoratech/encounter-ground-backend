@@ -2,12 +2,16 @@ import { Router } from "express";
 import { z } from "zod";
 import { query } from "../db/pool.js";
 import { requireAdmin, requireAuth, requireStaff, type AuthedRequest } from "../middleware/auth.js";
+import { adminCatalogueRouter } from "./adminCatalogue.js";
 
 // The admin dashboard: for staff (editors and admins). Teachers review checkpoints and the
 // team works through contact messages; only admins see the member list and change roles.
 export const adminRouter = Router();
 
 adminRouter.use(requireAuth, requireStaff);
+
+// Books, classes, modules, lessons and final checks.
+adminRouter.use(adminCatalogueRouter);
 
 const idParam = z.uuid();
 
