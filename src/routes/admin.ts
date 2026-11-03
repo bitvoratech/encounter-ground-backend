@@ -3,6 +3,7 @@ import { z } from "zod";
 import { query } from "../db/pool.js";
 import { requireAdmin, requireAuth, requireStaff, type AuthedRequest } from "../middleware/auth.js";
 import { adminCatalogueRouter } from "./adminCatalogue.js";
+import { adminSiteContentRouter } from "./siteContent.js";
 
 // The admin dashboard: for staff (editors and admins). Teachers review checkpoints and the
 // team works through contact messages; only admins see the member list and change roles.
@@ -12,6 +13,8 @@ adminRouter.use(requireAuth, requireStaff);
 
 // Books, classes, modules, lessons and final checks.
 adminRouter.use(adminCatalogueRouter);
+// Contact details, the YADA conference and the home page links.
+adminRouter.use(adminSiteContentRouter);
 
 const idParam = z.uuid();
 
