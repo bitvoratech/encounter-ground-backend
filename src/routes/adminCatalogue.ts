@@ -3,6 +3,7 @@ import type pg from "pg";
 import { z } from "zod";
 import { env } from "../config/env.js";
 import { pool, query } from "../db/pool.js";
+import { supabaseAdmin } from "../db/supabase.js";
 
 // Admin for books and classes. Mounted inside the admin router, so every route here is for
 // staff (editors and admins). Covers and lesson files are uploaded by the browser straight
@@ -115,7 +116,7 @@ const currencies = ["CAD", "USD", "NGN"] as const;
 
 const BOOK_SELECT = `
   select b.id, b.slug, b.title, b.subtitle, b.author, b.audience, b.description, b.cover_image_url,
-         b.amazon_url, b.page_count, b.sort_order, b.status, b.updated_at,
+         b.amazon_url, b.page_count, b.pages_ready, b.sort_order, b.status, b.updated_at,
          coalesce((select json_object_agg(p.currency, p.amount) from book_prices p where p.book_id = b.id), '{}') as prices,
          (select count(*) from user_books ub where ub.book_id = b.id)::int as owners
     from books b`;
@@ -586,5 +587,108 @@ adminCatalogueRouter.delete("/lessons/:id", async (req, res) => {
   if (!id.success) return res.status(404).json({ error: "Lesson not found" });
   const [row] = await query(`delete from lessons where id = $1 returning id`, [id.data]);
   if (!row) return res.status(404).json({ error: "Lesson not found" });
+  res.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// Book pages for the reader. The admin page turns the PDF into page images in the browser
+// and uploads them to the private book-pages bucket under <book id>/<upload id>/; this
+// records them and removes the previous set.
+// ---------------------------------------------------------------------------
+
+const pagesSchema = z.object({
+  /** Folder the images were uploaded to, e.g. "<book id>/<upload id>". */
+  folder: z.string().regex(/^[0-9a-f-]{36}\/[0-9a-f-]{36}$/, "Upload the pages again"),
+  pages: z
+    .array(
+      z.object({
+        file: z.string().regex(/^\d{1,4}\.(webp|jpg)$/),
+        width: z.number().int().min(1).max(10000),
+        height: z.number().int().min(1).max(10000),
+      }),
+    )
+    .min(1, "The PDF has no pages")
+    .max(2000),
+});
+
+adminCatalogueRouter.put("/books/:id/pages", async (req, res) => {
+  const id = idParam.safeParse(req.params.id);
+  const body = pagesSchema.safeParse(req.body);
+  if (!id.success) return res.status(404).json({ error: "Book not found" });
+  if (!body.success) return badRequest(res, body.error);
+  if (!body.data.folder.startsWith(`${id.data}/`)) return res.status(400).json({ error: "Upload the pages again" });
+
+  const previous = await transaction(async (client) => {
+    const { rows: book } = await client.query(`select 1 from books where id = $1 for update`, [id.data]);
+    if (!book[0]) return null;
+    const { rows: old } = await client.query<{ storage_path: string }>(
+      `delete from book_pages where book_id = $1 returning storage_path`,
+      [id.data],
+    );
+    for (const [i, p] of body.data.pages.entries())
+      await client.query(
+        `insert into book_pages (book_id, page_number, storage_path, width, height) values ($1, $2, $3, $4, $5)`,
+        [id.data, i + 1, `${body.data.folder}/${p.file}`, p.width, p.height],
+      );
+    await client.query(`update books set page_count = $2, pages_ready = true where id = $1`, [id.data, body.data.pages.length]);
+    return old.map((r) => r.storage_path);
+  });
+  if (!previous) return res.status(404).json({ error: "Book not found" });
+
+  // The old images are no longer referenced. Removing them is tidy-up, so a failure is only logged.
+  const stale = previous.filter((p) => !p.startsWith(`${body.data.folder}/`));
+  for (let i = 0; i < stale.length; i += 100) {
+    const { error } = await supabaseAdmin.storage.from("book-pages").remove(stale.slice(i, i + 100));
+    if (error) console.error("Removing old book pages:", error.message);
+  }
+  res.json({ page_count: body.data.pages.length });
+});
+
+// ---------------------------------------------------------------------------
+// Who owns a book. Purchases add owners once payments are live; the team can also give a
+// book to someone (a gift, a replacement, or to test the reader) or take it back.
+// ---------------------------------------------------------------------------
+
+adminCatalogueRouter.get("/books/:id/owners", async (req, res) => {
+  const id = idParam.safeParse(req.params.id);
+  if (!id.success) return res.status(404).json({ error: "Book not found" });
+  const rows = await query(
+    `select p.id, p.full_name, p.email, ub.granted_at, ub.last_page, ub.last_read_at, ub.order_id is not null as purchased
+       from user_books ub join profiles p on p.id = ub.user_id
+      where ub.book_id = $1
+      order by ub.granted_at desc
+      limit 500`,
+    [id.data],
+  );
+  res.json(rows);
+});
+
+const giveSchema = z.object({ email: z.email("Enter the member’s email address").trim().toLowerCase() });
+
+adminCatalogueRouter.post("/books/:id/owners", async (req, res) => {
+  const id = idParam.safeParse(req.params.id);
+  const body = giveSchema.safeParse(req.body);
+  if (!id.success) return res.status(404).json({ error: "Book not found" });
+  if (!body.success) return badRequest(res, body.error);
+  const [member] = await query<{ id: string }>(`select id from profiles where email = $1`, [body.data.email]);
+  if (!member) return res.status(404).json({ error: "No one has an account with that email. Ask them to sign up first." });
+  const [book] = await query(`select 1 from books where id = $1`, [id.data]);
+  if (!book) return res.status(404).json({ error: "Book not found" });
+  await query(`insert into user_books (user_id, book_id) values ($1, $2) on conflict do nothing`, [member.id, id.data]);
+  res.status(201).json({ ok: true });
+});
+
+/** Take back a book the team gave. Bought copies are kept: a refund handles those. */
+adminCatalogueRouter.delete("/books/:id/owners/:userId", async (req, res) => {
+  const id = idParam.safeParse(req.params.id);
+  const userId = idParam.safeParse(req.params.userId);
+  if (!id.success || !userId.success) return res.status(404).json({ error: "Not found" });
+  const [row] = await query<{ purchased: boolean }>(
+    `select order_id is not null as purchased from user_books where book_id = $1 and user_id = $2`,
+    [id.data, userId.data],
+  );
+  if (!row) return res.status(404).json({ error: "That member doesn’t have this book" });
+  if (row.purchased) return res.status(409).json({ error: "This copy was bought, so it can’t be taken back here." });
+  await query(`delete from user_books where book_id = $1 and user_id = $2`, [id.data, userId.data]);
   res.json({ ok: true });
 });

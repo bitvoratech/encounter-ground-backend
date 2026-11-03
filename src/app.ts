@@ -9,6 +9,7 @@ import { selfTestsRouter } from "./routes/selfTests.js";
 import { contactRouter } from "./routes/contact.js";
 import { coursesRouter, myCoursesRouter } from "./routes/school.js";
 import { adminRouter } from "./routes/admin.js";
+import { siteContentRouter } from "./routes/siteContent.js";
 
 export const app = express();
 
@@ -32,6 +33,7 @@ app.use("/books", booksRouter);
 app.use("/events", eventsRouter);
 app.use("/self-tests", selfTestsRouter);
 app.use("/contact", contactRouter);
+app.use("/site-content", siteContentRouter);
 app.use("/admin", adminRouter);
 
 app.use((_req, res) => {

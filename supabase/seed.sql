@@ -23,12 +23,12 @@ on conflict (slug) do nothing;
 
 insert into public.site_content (key, value) values
   ('contact', '{
-     "email": "General@encounterground.org",
-     "phone": "08099977733",
+     "email": "info@encounterground.org",
+     "phone": "0818 517 6780",
      "instagram": "https://www.instagram.com/encounter_ground",
+     "youtube": "https://www.youtube.com/@EncounterGroundTV",
      "tiktok": "https://www.tiktok.com/@encounterground",
-     "youtube": "EncounterGroundTV",
-     "whatsapp": "https://whatsapp.com/channel/0029VbDonGGKmCPZKguofK3T"
+     "whatsapp_channel": "https://whatsapp.com/channel/0029VbDonGGKmCPZKguofK3T"
    }'::jsonb),
   ('school.classes', '["Halak", "Chayil", "Becoming", "Whispers"]'::jsonb)
 on conflict (key) do nothing;
