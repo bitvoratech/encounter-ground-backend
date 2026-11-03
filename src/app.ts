@@ -43,3 +43,7 @@ const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   res.status(500).json({ error: "Something went wrong" });
 };
 app.use(errorHandler);
+
+// Vercel runs this file as the serverless entry point and needs the app as the
+// default export. Locally, src/index.ts imports it and calls listen().
+export default app;
