@@ -1,7 +1,8 @@
 import { Router, type Response } from "express";
 import { z } from "zod";
 import { pool, query } from "../db/pool.js";
-import { requireAuth, type AuthedRequest } from "../middleware/auth.js";
+import { supabaseAdmin } from "../db/supabase.js";
+import { optionalAuth, requireAuth, type AuthedRequest } from "../middleware/auth.js";
 
 // Beth-El Institute. The catalogue (classes, modules, lesson outlines, final-check
 // questions without answers) is public. Learning — enrolling, progress, checkpoints,
@@ -102,6 +103,47 @@ coursesRouter.get("/:slug", async (req, res) => {
     })),
     quiz,
   });
+});
+
+/**
+ * A lesson's content: its written teaching, video link and file (a short-lived signed link
+ * to the PDF or audio). Open to everyone for preview lessons, otherwise to enrolled students.
+ */
+coursesRouter.get("/:slug/lessons/:lesson", optionalAuth, async (req: AuthedRequest, res) => {
+  const course = await findCourse(req.params.slug as string);
+  if (!course) return res.status(404).json({ error: "Class not found" });
+  const [lesson] = await query<{
+    id: string;
+    preview: boolean;
+    body: string | null;
+    video_url: string | null;
+    attachment_path: string | null;
+  }>(
+    `select l.id, l.is_preview as preview, l.body, l.video_url, l.attachment_path
+       from lessons l join course_modules m on m.id = l.module_id
+      where m.course_id = $1 and l.slug = $2
+      order by m.position, l.position
+      limit 1`,
+    [course.id, req.params.lesson],
+  );
+  if (!lesson) return res.status(404).json({ error: "Lesson not found" });
+
+  if (!lesson.preview) {
+    if (!req.user) return res.status(401).json({ error: "Sign in to open this lesson." });
+    const [enrolled] = await query(`select 1 from enrollments where user_id = $1 and course_id = $2`, [req.user.id, course.id]);
+    if (!enrolled) return res.status(403).json({ error: "Enrol in this class first." });
+  }
+
+  let file_url: string | null = null;
+  if (lesson.attachment_path) {
+    const { data, error } = await supabaseAdmin.storage
+      .from("lesson-files")
+      .createSignedUrl(lesson.attachment_path, 60 * 60);
+    if (error) console.error(`Lesson file ${lesson.attachment_path}:`, error.message);
+    file_url = data?.signedUrl ?? null;
+  }
+  res.set("Cache-Control", "private, no-store");
+  res.json({ body: lesson.body, video_url: lesson.video_url, file_url });
 });
 
 // ---------------------------------------------------------------------------
