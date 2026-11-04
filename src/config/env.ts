@@ -6,7 +6,8 @@ const schema = z.object({
   NODE_ENV: z
     .enum(["development", "production", "test"])
     .default("development"),
-  FRONTEND_URL: z.url(),
+  // One origin, or several separated by commas (e.g. production + preview).
+  FRONTEND_URL: z.string().min(1),
   // Postgres connection string from Supabase (Project Settings → Database).
   DATABASE_URL: z.string().min(1),
   SUPABASE_URL: z.url(),
