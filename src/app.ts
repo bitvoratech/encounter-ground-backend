@@ -15,7 +15,12 @@ export const app = express();
 
 app.set("trust proxy", 1);
 app.use(helmet());
-app.use(cors({ origin: env.FRONTEND_URL, credentials: true }));
+// Browsers send the Origin header without a trailing slash, so normalise
+// FRONTEND_URL (which may hold several comma-separated origins) to match.
+const allowedOrigins = env.FRONTEND_URL.split(",")
+  .map((o) => o.trim().replace(/\/+$/, ""))
+  .filter(Boolean);
+app.use(cors({ origin: allowedOrigins, credentials: true }));
 // NOTE: the Paystack webhook needs the raw body to verify its signature, so
 // mount it here, before express.json(), when payments are built (week 4).
 app.use(express.json({ limit: "1mb" }));
